@@ -1,6 +1,9 @@
 # SDFGen
-A simple commandline utility to generate grid-based signed distance field (level set) generator from triangle meshes, using code from Robert Bridson's website.
+This version was adapted by Stefaan Van wal from the original by Christopher Batty, to generate the SDF of a small-body polyhedron shape model. The original readme and license of SDFGen are copied below.
 
+---------------------
+
+A simple commandline utility to generate grid-based signed distance field (level set) generator from triangle meshes, using code from Robert Bridson's website.
 
 The MIT License (MIT)
 

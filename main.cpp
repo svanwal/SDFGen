@@ -1,180 +1,199 @@
-//SDFGen - A simple grid-based signed distance field (level set) generator for triangle meshes.
-//Written by Christopher Batty (christopherbatty@yahoo.com, www.cs.columbia.edu/~batty)
-//...primarily using code from Robert Bridson's website (www.cs.ubc.ca/~rbridson)
-//This code is public domain. Feel free to mess with it, let me know if you like it.
+// SDFGen - A simple commandline utility to convert polyhedron shape models of small bodies into signed distance fields.
+// This code is based on the GitHub repo by Christopher Batty, which was released under the MIT License
+// The original header and MIT License are copied at the bottom of this main file.
 
 #include "makelevelset3.h"
 #include "config.h"
-
-#ifdef HAVE_VTK
-  #include <vtkImageData.h>
-  #include <vtkFloatArray.h>
-  #include <vtkXMLImageDataWriter.h>
-  #include <vtkPointData.h>
-  #include <vtkSmartPointer.h>
-#endif
-
-
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <limits>
+#include <string>
 
 int main(int argc, char* argv[]) {
-  
-  if(argc != 4) {
-    std::cout << "SDFGen - A utility for converting closed oriented triangle meshes into grid-based signed distance fields.\n";
-    std::cout << "\nThe output file format is:";
-    std::cout << "<ni> <nj> <nk>\n";
-    std::cout << "<origin_x> <origin_y> <origin_z>\n";
-    std::cout << "<dx>\n";
-    std::cout << "<value_1> <value_2> <value_3> [...]\n\n";
+
+    // Checking number of inputs
+    if(argc != 4) {
+        std::cout << "******\n";
+        std::cout << "SDFGen - A utility for converting polyhedron shape models of small bodies into grid-based signed distance fields.\n";
+        std::cout << "******\n\n";
+        std::cout << "Usage: ./bin/SDFGen <filename> <dx> <padding>\n";
+        std::cout << "  <filename> specifies a Wavefront OBJ (text) file representing a *triangle* mesh (no quad or poly meshes allowed). File must use the suffix \".obj\".\n";
+        std::cout << "  <dx> specifies the length of grid cell in the resulting distance field.\n";
+        std::cout << "  <padding> specifies the number of cells worth of padding between the object bounding box and the boundary of the distance field grid. Minimum is 1.\n\n";
+        std::cout << "The output filename will match that of the input, with the OBJ suffix replaced with SDF. The output file format is:\n";
+        std::cout << "  <ni> <nj> <nk> the integer dimensions of the resulting distance field\n";
+        std::cout << "  <origin_x> <origin_y> <origin_z> the 3D position of the grid origin\n";
+        std::cout << "  <dx> the grid spacing\n";
+        std::cout << "  <d000> <d001> <d002> <...> the signed distance data values, in ascending order of i, then j, then k\n\n";
+        exit(-1);
+    }
+
+    // Reading inputs
+    std::string filename(argv[1]);
+    if(filename.size() < 5 || filename.substr(filename.size()-4) != std::string(".obj")) {
+      std::cerr << "Error: Expected OBJ file with filename of the form <name>.obj.\n";
+      exit(-1);
+    }
+    // Read cell size
+    std::stringstream arg2(argv[2]);
+    float dx;
+    arg2 >> dx;
+    // Read padding
+    std::stringstream arg3(argv[3]);
+    int padding;
+    arg3 >> padding;
+    if(padding<1){padding = 1;}
     
-    std::cout << "(ni,nj,nk) are the integer dimensions of the resulting distance field.\n";
-    std::cout << "(origin_x,origin_y,origin_z) is the 3D position of the grid origin.\n";
-    std::cout << "<dx> is the grid spacing.\n\n";
-    std::cout << "<value_n> are the signed distance data values, in ascending order of i, then j, then k.\n";
+    // Start with a massive inside out bound box.
+    Vec3f min_box(std::numeric_limits<float>::max(),std::numeric_limits<float>::max(),std::numeric_limits<float>::max());
+    Vec3f max_box(-std::numeric_limits<float>::max(),-std::numeric_limits<float>::max(),-std::numeric_limits<float>::max());
 
-    std::cout << "The output filename will match that of the input, with the OBJ suffix replaced with SDF.\n\n";
+    // Reading vertices and facets
+    std::cout << "Reading .OBJ shape model <" << filename << ">...\n";
+    std::ifstream infile(argv[1]);
+    if(!infile) {
+      std::cerr << "   Failed to open. Terminating.\n";
+      exit(-1);
+    }
 
-    std::cout << "Usage: SDFGen <filename> <dx> <padding>\n\n";
-    std::cout << "Where:\n";
-    std::cout << "\t<filename> specifies a Wavefront OBJ (text) file representing a *triangle* mesh (no quad or poly meshes allowed). File must use the suffix \".obj\".\n";
-    std::cout << "\t<dx> specifies the length of grid cell in the resulting distance field.\n";
-    std::cout << "\t<padding> specifies the number of cells worth of padding between the object bound box and the boundary of the distance field grid. Minimum is 1.\n\n";
+    int ignored_lines = 0;
+    std::string line;
+    std::vector<Vec3f>  pts;
+    std::vector<Vec3ui> tri;
+    uint f = 0;
     
-    exit(-1);
-  }
-
-  std::string filename(argv[1]);
-  if(filename.size() < 5 || filename.substr(filename.size()-4) != std::string(".obj")) {
-    std::cerr << "Error: Expected OBJ file with filename of the form <name>.obj.\n";
-    exit(-1);
-  }
-
-  std::stringstream arg2(argv[2]);
-  float dx;
-  arg2 >> dx;
-  
-  std::stringstream arg3(argv[3]);
-  int padding;
-  arg3 >> padding;
-
-  if(padding < 1) padding = 1;
-  //start with a massive inside out bound box.
-  Vec3f min_box(std::numeric_limits<float>::max(),std::numeric_limits<float>::max(),std::numeric_limits<float>::max()), 
-    max_box(-std::numeric_limits<float>::max(),-std::numeric_limits<float>::max(),-std::numeric_limits<float>::max());
-  
-  std::cout << "Reading data.\n";
-
-  std::ifstream infile(argv[1]);
-  if(!infile) {
-    std::cerr << "Failed to open. Terminating.\n";
-    exit(-1);
-  }
-
-  int ignored_lines = 0;
-  std::string line;
-  std::vector<Vec3f> vertList;
-  std::vector<Vec3ui> faceList;
-  while(!infile.eof()) {
-    std::getline(infile, line);
-
-    //.obj files sometimes contain vertex normals indicated by "vn"
-    if(line.substr(0,1) == std::string("v") && line.substr(0,2) != std::string("vn")){
-      std::stringstream data(line);
-      char c;
-      Vec3f point;
-      data >> c >> point[0] >> point[1] >> point[2];
-      vertList.push_back(point);
-      update_minmax(point, min_box, max_box);
+    while(!infile.eof()){ //https://en.wikipedia.org/wiki/Wavefront_.obj_file
+        std::getline(infile, line);
+        if(line.substr(0,1) == std::string("v") && line.substr(0,2) != std::string("vn")){ // Reading a vertex
+            std::stringstream data(line);
+            char c;
+            Vec3f point;
+            data >> c >> point[0] >> point[1] >> point[2];
+            pts.push_back(point);
+            update_minmax(point, min_box, max_box);
+        }
+        else if(line.substr(0,1) == std::string("f")){ // Reading a facet
+            std::stringstream data(line);
+            char c;
+            std::string f1, f2, f3;
+            data >> c >> f1 >> f2 >> f3;
+            uint l1 = f1.length();
+            uint l2 = f2.length();
+            uint l3 = f3.length();
+            uint k1, k2, k3;
+            if(l1<4 || l2<4 || l3<4){ // No texture/color info in the facet
+                k1 = atoi(f1.c_str()) - 1;
+                k2 = atoi(f2.c_str()) - 1;
+                k3 = atoi(f3.c_str()) - 1;
+            }
+            else{ // There may be texture/color info that needs to be cut 
+                std::string m1 = f1.substr((l1-2)/2,2);
+                std::string m2 = f2.substr((l2-2)/2,2);
+                std::string m3 = f3.substr((l3-2)/2,2);
+                if(m1==std::string("//")){ // There is texture/color info
+                    k1 = atoi(f1.substr(0,(l1-2)/2).c_str()) - 1;
+                }
+                else{ // There is not
+                    k1 = atoi(f1.c_str()) - 1;
+                }
+                if(m2==std::string("//")){ // There is texture/color info
+                    k2 = atoi(f2.substr(0,(l2-2)/2).c_str()) - 1;
+                }
+                else{ // There is not
+                    k2 = atoi(f2.c_str()) - 1;
+                }
+                if(m3==std::string("//")){ /// There is texture/color info
+                    k3 = atoi(f3.substr(0,(l3-2)/2).c_str()) - 1;
+                }
+                else{ // There is not
+                    k3 = atoi(f3.c_str()) - 1;
+                }
+            }
+            tri.push_back(Vec3ui(k1,k2,k3));
+            f++;
+        }
+        else{
+            ++ignored_lines;
+        }
     }
-    else if(line.substr(0,1) == std::string("f")) {
-      std::stringstream data(line);
-      char c;
-      int v0,v1,v2;
-      data >> c >> v0 >> v1 >> v2;
-      faceList.push_back(Vec3ui(v0-1,v1-1,v2-1));
+    infile.close();
+    std::cout << "   Read in " << pts.size() << " vertices and " << tri.size() << " faces." << std::endl;
+    if(tri.size()==2*pts.size()-4){
+        std::cout << "   This model satisfies Euler's rule for watertight triangular polyhedra.\n";
     }
-    else if( line.substr(0,2) == std::string("vn") ){
-      std::cerr << "Obj-loader is not able to parse vertex normals, please strip them from the input file. \n";
-      exit(-2); 
+    else{
+        std::cout << "   WARNING: This model DOES NOT satisfy Euler's rule for watertight triangular polyhedra.\n";
+        std::cout << "            Based on the number of vertices, it should have " << 2*pts.size()-4 << " facets instead.\n";
+        std::cout << "            SDFGen will proceed, but use the resulting SDF at your own risk...\n";
     }
-    else {
-      ++ignored_lines; 
-    }
-  }
-  infile.close();
-  
-  if(ignored_lines > 0)
-    std::cout << "Warning: " << ignored_lines << " lines were ignored since they did not contain faces or vertices.\n";
 
-  std::cout << "Read in " << vertList.size() << " vertices and " << faceList.size() << " faces." << std::endl;
-
-  //Add padding around the box.
-  Vec3f unit(1,1,1);
-  min_box -= padding*dx*unit;
-  max_box += padding*dx*unit;
-  Vec3ui sizes = Vec3ui((max_box - min_box)/dx);
-  
-  std::cout << "Bound box size: (" << min_box << ") to (" << max_box << ") with dimensions " << sizes << "." << std::endl;
-
-  std::cout << "Computing signed distance field.\n";
-  Array3f phi_grid;
-  make_level_set3(faceList, vertList, min_box, dx, sizes[0], sizes[1], sizes[2], phi_grid);
-
-  std::string outname;
-
-  #ifdef HAVE_VTK
-    // If compiled with VTK, we can directly output a volumetric image format instead
-    //Very hackily strip off file suffix.
-    outname = filename.substr(0, filename.size()-4) + std::string(".vti");
-    std::cout << "Writing results to: " << outname << "\n";
-    vtkSmartPointer<vtkImageData> output_volume = vtkSmartPointer<vtkImageData>::New();
-
-    output_volume->SetDimensions(phi_grid.ni ,phi_grid.nj ,phi_grid.nk);
-    output_volume->SetOrigin( phi_grid.ni*dx/2, phi_grid.nj*dx/2,phi_grid.nk*dx/2);
-    output_volume->SetSpacing(dx,dx,dx);
-
-    vtkSmartPointer<vtkFloatArray> distance = vtkSmartPointer<vtkFloatArray>::New();
     
-    distance->SetNumberOfTuples(phi_grid.a.size());
-    
-    output_volume->GetPointData()->AddArray(distance);
-    distance->SetName("Distance");
+    // Add padding around the box.
+    std::cout << "Computing SDF...\n";
+    Vec3f unit(1,1,1);
+    min_box -= padding*dx*unit;
+    max_box += padding*dx*unit;
+    Vec3ui sizes = Vec3ui((max_box - min_box)/dx);
+    std::cout << "   Origin of the SDF: (" << min_box << ")\n";
+    std::cout << "   Maximum extent of the SDF: (" << max_box << ")\n";
+    std::cout << "   Dimensions of the SDF: (" << sizes << ") cells\n";
+    Array3f d_grid;
+    make_level_set3(tri, pts, min_box, dx, sizes[0], sizes[1], sizes[2], d_grid); // Compute the SDF
+    std::cout << "\n   The SDF has been computed!\n";
 
-    for(unsigned int i = 0; i < phi_grid.a.size(); ++i) {
-      distance->SetValue(i, phi_grid.a[i]);
+    // Saving as text file
+    std::string outname = filename.substr(0, filename.size()-4) + std::string("_sdf.txt");
+    std::cout << "Saving the SDF to file <" << outname << ">...\n";
+    std::ofstream fs;
+    fs.open(outname.c_str());
+    fs.precision(8); // Select precision here
+    if(!fs.is_open()){
+        std::cout << "   Error: Unable to open file! Check the permissions.\n";
     }
-
-    vtkSmartPointer<vtkXMLImageDataWriter> writer =
-    vtkSmartPointer<vtkXMLImageDataWriter>::New();
-    writer->SetFileName(outname.c_str());
-
-    #if VTK_MAJOR_VERSION <= 5
-      writer->SetInput(output_volume);
-    #else
-      writer->SetInputData(output_volume);
-    #endif
-    writer->Write();
-
-  #else
-    // if VTK support is missing, default back to the original ascii file-dump.
-    //Very hackily strip off file suffix.
-    outname = filename.substr(0, filename.size()-4) + std::string(".sdf");
-    std::cout << "Writing results to: " << outname << "\n";
-    
-    std::ofstream outfile( outname.c_str());
-    outfile << phi_grid.ni << " " << phi_grid.nj << " " << phi_grid.nk << std::endl;
-    outfile << min_box[0] << " " << min_box[1] << " " << min_box[2] << std::endl;
-    outfile << dx << std::endl;
-    for(unsigned int i = 0; i < phi_grid.a.size(); ++i) {
-      outfile << phi_grid.a[i] << std::endl;
+    fs << d_grid.ni << " " << d_grid.nj << " " << d_grid.nk << "\n";
+    fs << min_box[0] << " " << min_box[1] << " " << min_box[2] << "\n";
+    fs << dx << "\n";
+    uint p = 0;
+    for(uint k=0; k<d_grid.nk; k++){
+        std::cout << "\r   Progress " << 100.0*(float)k/(float)(d_grid.nk-1) << "%                ";
+        for(uint j=0; j<d_grid.nj; j++){
+            for(uint i=0; i<d_grid.ni; i++){
+                fs << d_grid.a[p] << " ";
+                p++;
+            }
+        }
     }
-    outfile.close();
-  #endif
+    fs.close();
+    std::cout << "\n   Saving completed.\n";
 
-  std::cout << "Processing complete.\n";
-
-return 0;
+    std::cout << "SDFGen has finished. See you next time!\n";
+    return 0;
+    
 }
+
+//SDFGen - A simple grid-based signed distance field (level set) generator for triangle meshes.
+//Written by Christopher Batty (christopherbatty@yahoo.com, www.cs.columbia.edu/~batty)
+//...primarily using code from Robert Bridson's website (www.cs.ubc.ca/~rbridson)
+//This code is public domain. Feel free to mess with it, let me know if you like it.
+//
+//The MIT License (MIT)
+//
+//Copyright (c) 2015, Christopher Batty
+//
+//Permission is hereby granted, free of charge, to any person obtaining a copy of
+//this software and associated documentation files (the "Software"), to deal in
+//the Software without restriction, including without limitation the rights to
+//use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+//of the Software, and to permit persons to whom the Software is furnished to do
+//so, subject to the following conditions:
+//
+//The above copyright notice and this permission notice shall be included in all
+//copies or substantial portions of the Software.
+//
+//THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+//FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+//COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+//IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+//CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

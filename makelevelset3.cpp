@@ -1,4 +1,5 @@
 #include "makelevelset3.h"
+#include <stdio.h>
 
 // find distance x0 is from segment x1-x2
 static float point_segment_distance(const Vec3f &x0, const Vec3f &x1, const Vec3f &x2)
@@ -56,7 +57,7 @@ static void check_neighbour(const std::vector<Vec3ui> &tri, const std::vector<Ve
 
 static void sweep(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x,
                   Array3f &phi, Array3i &closest_tri, const Vec3f &origin, float dx,
-                  int di, int dj, int dk)
+                  int di, int dj, int dk, int sweep_id, int pass_id)
 {
    int i0, i1;
    if(di>0){ i0=1; i1=phi.ni; }
@@ -67,15 +68,18 @@ static void sweep(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x,
    int k0, k1;
    if(dk>0){ k0=1; k1=phi.nk; }
    else{ k0=phi.nk-2; k1=-1; }
-   for(int k=k0; k!=k1; k+=dk) for(int j=j0; j!=j1; j+=dj) for(int i=i0; i!=i1; i+=di){
-      Vec3f gx(i*dx+origin[0], j*dx+origin[1], k*dx+origin[2]);
-      check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i-di, j,    k);
-      check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i,    j-dj, k);
-      check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i-di, j-dj, k);
-      check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i,    j,    k-dk);
-      check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i-di, j,    k-dk);
-      check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i,    j-dj, k-dk);
-      check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i-di, j-dj, k-dk);
+   for(int k=k0; k!=k1; k+=dk) {
+     std::cout << "\r   Pass #" << (pass_id+1) << " of 2, sweep #" << (sweep_id+1) << " of 8, k=" << (k+1) << "/" << k1 << "...             ";
+     for(int j=j0; j!=j1; j+=dj) for(int i=i0; i!=i1; i+=di){
+        Vec3f gx(i*dx+origin[0], j*dx+origin[1], k*dx+origin[2]);
+        check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i-di, j,    k);
+        check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i,    j-dj, k);
+        check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i-di, j-dj, k);
+        check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i,    j,    k-dk);
+        check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i-di, j,    k-dk);
+        check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i,    j-dj, k-dk);
+        check_neighbour(tri, x, phi, closest_tri, gx, i, j, k, i-di, j-dj, k-dk);
+    }
    }
 }
 
@@ -128,6 +132,7 @@ void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x
    for(unsigned int t=0; t<tri.size(); ++t){
      unsigned int p, q, r; assign(tri[t], p, q, r);
      // coordinates in grid to high precision
+      //printf("%d:%d:%d \n",p,q,r);
       double fip=((double)x[p][0]-origin[0])/dx, fjp=((double)x[p][1]-origin[1])/dx, fkp=((double)x[p][2]-origin[2])/dx;
       double fiq=((double)x[q][0]-origin[0])/dx, fjq=((double)x[q][1]-origin[1])/dx, fkq=((double)x[q][2]-origin[2])/dx;
       double fir=((double)x[r][0]-origin[0])/dx, fjr=((double)x[r][1]-origin[1])/dx, fkr=((double)x[r][2]-origin[2])/dx;
@@ -161,14 +166,14 @@ void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x
    }
    // and now we fill in the rest of the distances with fast sweeping
    for(unsigned int pass=0; pass<2; ++pass){
-      sweep(tri, x, phi, closest_tri, origin, dx, +1, +1, +1);
-      sweep(tri, x, phi, closest_tri, origin, dx, -1, -1, -1);
-      sweep(tri, x, phi, closest_tri, origin, dx, +1, +1, -1);
-      sweep(tri, x, phi, closest_tri, origin, dx, -1, -1, +1);
-      sweep(tri, x, phi, closest_tri, origin, dx, +1, -1, +1);
-      sweep(tri, x, phi, closest_tri, origin, dx, -1, +1, -1);
-      sweep(tri, x, phi, closest_tri, origin, dx, +1, -1, -1);
-      sweep(tri, x, phi, closest_tri, origin, dx, -1, +1, +1);
+      sweep(tri, x, phi, closest_tri, origin, dx, +1, +1, +1, 0, pass);
+      sweep(tri, x, phi, closest_tri, origin, dx, -1, -1, -1, 1, pass);
+      sweep(tri, x, phi, closest_tri, origin, dx, +1, +1, -1, 2, pass);
+      sweep(tri, x, phi, closest_tri, origin, dx, -1, -1, +1, 3, pass);
+      sweep(tri, x, phi, closest_tri, origin, dx, +1, -1, +1, 4, pass);
+      sweep(tri, x, phi, closest_tri, origin, dx, -1, +1, -1, 5, pass);
+      sweep(tri, x, phi, closest_tri, origin, dx, +1, -1, -1, 6, pass);
+      sweep(tri, x, phi, closest_tri, origin, dx, -1, +1, +1, 7, pass);
    }
    // then figure out signs (inside/outside) from intersection counts
    for(int k=0; k<nk; ++k) for(int j=0; j<nj; ++j){
@@ -182,3 +187,11 @@ void make_level_set3(const std::vector<Vec3ui> &tri, const std::vector<Vec3f> &x
    }
 }
 
+//void mypause(){
+//    
+//    int temp;
+//    std::cout << "Paused. Enter any number to continue... ";
+//    std::cin >> temp;
+//    std::cout << std::endl;
+//    
+//}
