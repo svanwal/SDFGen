@@ -9,6 +9,7 @@
 #include <sstream>
 #include <limits>
 #include <string>
+#include <ctime>
 
 int main(int argc, char* argv[]) {
 
@@ -139,8 +140,11 @@ int main(int argc, char* argv[]) {
     std::cout << "   Maximum extent of the SDF: (" << max_box << ")\n";
     std::cout << "   Dimensions of the SDF: (" << sizes << ") cells\n";
     Array3f d_grid;
+    std::clock_t t_start = std::clock();
     make_level_set3(tri, pts, min_box, dx, sizes[0], sizes[1], sizes[2], d_grid); // Compute the SDF
+    std::clock_t t_end = std::clock();
     std::cout << "\n   The SDF has been computed!\n";
+    std::cout << "   Elapsed time: " << (t_end - t_start)/(float)CLOCKS_PER_SEC << " seconds.\n";
 
     // Saving as text file
     std::string outname = filename.substr(0, filename.size()-4) + std::string("_sdf.txt");
