@@ -1,5 +1,5 @@
 # SDFGen
-This version was adapted by Stefaan Van wal from the original by Christopher Batty, to generate the SDF of a small-body polyhedron shape model. The original readme and license of SDFGen are copied below.
+This version was adapted by Stefaan Van wal from the original by Christopher Batty, to generate the SDF of a small-body polyhedron shape model. The original readme and license of SDFGen are copied below. For more information on the Matlab files, see the readme in the relevant folder.
 
 ---------------------
 
