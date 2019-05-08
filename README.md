@@ -1,28 +1,17 @@
 # SDFGen
-This version was adapted by Stefaan Van wal from the original by Christopher Batty, to generate the SDF of a small-body polyhedron shape model. The original readme and license of SDFGen are copied below. For more information on the Matlab files, see the readme in the relevant folder.
+A simple commandline utility to generate grid-based signed distance field (level set) from polyhedron shape models. This code was adapted by Stefaan Van wal from the original by Christopher Batty (see https://github.com/christopherbatty/SDFGen). The readme of Batty's original code can be found in the LICENSE.txt file.
 
----------------------
+To compile SDFGen with cmake, run the following commands in a terminal in the /SDFGen folder:
+cmake CMakeLists.txt
+make
 
-A simple commandline utility to generate grid-based signed distance field (level set) generator from triangle meshes, using code from Robert Bridson's website.
+To generate an SDF model, place the source .OBJ file containing the source polyhedron shape model in the /SDFGen folder and run:
 
-The MIT License (MIT)
+./bin/SDFGen <filename> <dx> <padding>
 
-Copyright (c) 2015, Christopher Batty
+in which:
+<filename> specifies a Wavefront OBJ (text) file representing a *triangle* mesh (no quad or poly meshes allowed). File must use the suffix .obj
+<dx> specifies the length of grid cell in the resulting distance field (in the same units as the source polyhedron).
+<padding> specifies the number of cells worth of padding between the object bounding box and the boundary of the distance field grid. Minimum is 1.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+This will generate a .txt file containing the resulting SDF model. This can be read into Matlab using the code and instructions provided in the /Matlab folder of this repository. Files for the 200k model of asteroid Ryugu have been provided. The higher-resolution models can be downloaded from http://www.darts.isas.jaxa.jp/pub/hayabusa2/paper/Watanabe_2019/
