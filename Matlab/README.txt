@@ -1,37 +1,17 @@
-License is in a separate file. This file contains the sample Matlab code that runs the examples
-from the paper.
+# Loading models
+The provided Matlab code comes with a loaded version of the SHAPE_SFM_200k_v20180804 model of asteroid Ryugu and a corresponding 5-meter signed distance field. To use different models, they need to be loaded into their proper Matlab structures using the load_models.m file. Simply replace the four filenames at the top of the script (and makes sure Matlab has access to the files).
 
-It already has a shape model and corresponding SDF of asteroid Ryugu loaded.
-If you want to use higher-resolution models, see the notes at the bottom
+# Running numerical tests
+Two numerical tests are included:
+x) Test1_Speed.m: This performs a sampling speed comparison between the polyhedron and SDF, as discussed in Section 3.2 of the paper.
+x) Test2_Shape.m: This quantifies the differences between the polyhedron and SDF, as discussed in Section 3.3 of the paper.
+These tests can be performed for different shape models by simply replacing the files to be loaded at the top of the scripts.
 
+# Running sample applications
+x) Application1_Altimeter.m: Runs the altimeter instrument example of Section 4.1 of the paper.
+x) Application2_Ejecta.m: Runs the particle ejecta simulation example of Section 4.2 of the paper.
+x) Application3_Shadows.m: Runs the shadow visualization example of Section 4.3 of the paper.
+These applications can be performed for different shape models by simply replacing the files to be loaded at the top of the scripts.
 
-
-%% RUNNING NUMERICAL TESTS
-
-
-%% RUNNING EXAMPLES
-Example 1: Run SDFdemo_Altimeter.m replace the files if you want to use the higher res models.
-Example 2: Run SDFdemo_Ejecta.m replace the files if you want to use the higher res models.
-Example 3: Run SDFdemo_ImageGenFrame.m
-
-%% LOADING MODELS
-
-If you want to use a higher-resolution one, you can download the shape models from
-http://www.darts.isas.jaxa.jp/pub/hayabusa2/paper/Watanabe_2019/
-You should open them with MeshLab which is free
-http://www.meshlab.net/
-and remove the unreferenced vertices (Filters>Cleaning>Remove unreferenced vertices)
-and then scale them to proper units (raw models are in km) (Filters>Normals, Curvatures, and Orientation>Transform: Scale, Normalize)
-by 1000 along the X, Y, and Z axes.
-Then do File>Export Mesh as... and save it as an .OBJ file.
-
-To construct the SDF, copy the .OBJ shape model file into the folder of SDFGen code,
-build SDFGen following the instructions in its readme, and then run
-./bin/SDFGen filename dx padding
-where dx is the resolution and padding is the number of cells to pad with (3 is fine).
-
-Then copy the resulting .txt file into your Matlab working folder and use the SDFdemo_Loading.m script
-to load it into Matlab. Make sure to adjust the filenames for loading and saving correctly.
-
-It uses the loadawobj2016, see the license file in the subfolder. It is unmodified and as provided on the MathWorks website,
-see https://www.mathworks.com/matlabcentral/fileexchange/10223-loadawobj
+# Third-party software
+This codes includes a copy of the loadawobj2016 repository by William Harwin. It is unmodified and was obtained from the MathWorks website from https://www.mathworks.com/matlabcentral/fileexchange/10223-loadawobj The license for this code can be found in the /Matlab/loadawobj2016 folder.
