@@ -1,13 +1,13 @@
-% This function loads the OBJ and SDF models that were read by
-% SDFdemo_Loading and compares the two shapes
+% This function compares the shapes of a polyhedron shape model and signed
+% distance field.
 clc
 close all
 clear all
 
 %% Loading models
 disp('Loading models...');
-load SHAPE_SFM_200k_v20180804.mat;
-load SDF_5m0_SFM_200k_v20180804.mat;
+load SHAPE_SFM_200k_v20180804.mat; % The desired polyhedron shape model
+load SDF_5m0_SFM_200k_v20180804; % The desired SDF model
 
 %% Sampling the SDF at the polyhedron vertices
 X_sdf = poly.pts;
@@ -73,12 +73,14 @@ subplot(1,2,1)
     xlabel('|\Delta d| [m]');
     ylabel('cdf [-]');
     set(gca,'fontsize',14);
+    title('Distance error');
 subplot(1,2,2)
     p1 = plot(sort(rad2deg(delta_theta)),(1:1:poly.nFacets)/poly.nFacets,'LineWidth',2);
     grid on
     xlabel('\Delta \theta [deg]');
     ylabel('cdf [-]');
     set(gca,'fontsize',14);
+    title('Normal vector direction error');
     
 figure(3)
 subplot(1,2,1)

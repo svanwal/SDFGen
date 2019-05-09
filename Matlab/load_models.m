@@ -3,11 +3,17 @@ clc
 close all
 clear all
 
+%% Filenames
+sdf_source =  'SDF_5m0_SFM_200k_v20180804.txt'; % Source file of the SDF
+poly_source = 'SHAPE_SFM_200k_v20180804.obj'; % Source file of the polyhedron
+sdf_target =  'SDF_5m0_SFM_200k_v20180804.mat'; % Target file for the SDF Matlab structure
+poly_target = 'SHAPE_SFM_200k_v20180804'; % Target file for the polyhedron Matlab structure
+
 %% Reading files
 disp('Loading SDF...');
-sdf = read_sdf('SDF_5m0_SFM_200K_v20180804.txt'); % Loads the SDF file
+sdf = read_sdf(sdf_source); % Loads the raw SDF file
 disp('Loading OBJ...');
-raw_poly = loadawobj('SHAPE_SFM_200k_v20180804.obj'); % Loads the OBJ file
+raw_poly = loadawobj(poly_source); % Loads the raw OBJ file
 
 %% Preparing the polyhedron structure
 poly.nPoints = length(raw_poly.v); % Number of vertices
@@ -36,8 +42,8 @@ for f=1:poly.nFacets % Computing the outward-pointing facet normals and facet ce
 end
 
 %% Saving
-save('SDF_5m0_SFM_200k_v20180804.mat','sdf');
-save('SHAPE_SFM_200k_v20180804','poly');
+save(sdf_target,'sdf'); % Saves the SDF for use in Matlab
+save(poly_target,'poly'); % Saves the .OBJ for use in Matlab
 
 %% Plotting
 figure(1) % Plots the loaded OBJ polyhedron model

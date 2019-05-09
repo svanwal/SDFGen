@@ -1,13 +1,13 @@
-% This function loads the OBJ and SDF models that were read by
-% SDFdemo_Loading and compares the two shapes
+% This function compares the sampling performance between a polyhedron
+% shape model and a signed distance field.
 clc
 close all
 clear all
 
 %% Loading models
 disp('Loading models...');
-load SHAPE_SFM_200k_v20180804.mat;
-load SDF_5m0_SFM_200k_v20180804;
+load SHAPE_SFM_200k_v20180804.mat; % The desired polyhedron shape model
+load SDF_5m0_SFM_200k_v20180804; % The desired SDF model
 
 %% Random sampling of the models
 Np_sdf = 5e5; % Number of sample points for the SDF
