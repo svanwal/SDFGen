@@ -14,14 +14,15 @@
 int main(int argc, char* argv[]) {
 
     // Checking number of inputs
-    if(argc != 4) {
+    if(argc<4) {
         std::cout << "******\n";
         std::cout << "SDFGen - A utility for converting polyhedron shape models of small bodies into grid-based signed distance fields.\n";
         std::cout << "******\n\n";
-        std::cout << "Usage: ./bin/SDFGen <filename> <dx> <padding>\n";
+        std::cout << "Usage: ./bin/SDFGen <filename> <dx> <padding> <format>\n";
         std::cout << "  <filename> specifies a Wavefront OBJ (text) file representing a *triangle* mesh (no quad or poly meshes allowed). File must use the suffix \".obj\".\n";
         std::cout << "  <dx> specifies the length of grid cell in the resulting distance field.\n";
         std::cout << "  <padding> specifies the number of cells worth of padding between the object bounding box and the boundary of the distance field grid. Minimum is 1.\n\n";
+        std::cout << "   <format> is an optional argument that specifies the output format, use 0 to save as text file (default), 1 to save as binary file, and 2 to save as both.\n";
         std::cout << "The output filename will match that of the input, with the OBJ suffix replaced with SDF. The output file format is:\n";
         std::cout << "  <ni> <nj> <nk> the integer dimensions of the resulting distance field\n";
         std::cout << "  <origin_x> <origin_y> <origin_z> the 3D position of the grid origin\n";
@@ -45,6 +46,16 @@ int main(int argc, char* argv[]) {
     int padding;
     arg3 >> padding;
     if(padding<1){padding = 1;}
+    // Read output format
+    int format = 0;
+    if(argc>4){
+        std::stringstream arg4(argv[4]);
+        arg4 >> format;
+        if(format>2){
+            std::cerr << "Error: Output format must be 0, 1, or 2. You entered the value <" << format << ">\n";
+            exit(-1);
+        }
+    }
     
     // Start with a massive inside out bound box.
     Vec3f min_box(std::numeric_limits<float>::max(),std::numeric_limits<float>::max(),std::numeric_limits<float>::max());
@@ -54,7 +65,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Reading .OBJ shape model <" << filename << ">...\n";
     std::ifstream infile(argv[1]);
     if(!infile) {
-      std::cerr << "   Failed to open. Terminating.\n";
+      std::cerr << "   Failed to open. Is it in the right folder? Terminating.\n";
       exit(-1);
     }
 
@@ -128,7 +139,6 @@ int main(int argc, char* argv[]) {
         std::cout << "            Based on the number of vertices, it should have " << 2*pts.size()-4 << " facets instead.\n";
         std::cout << "            SDFGen will proceed, but use the resulting SDF at your own risk...\n";
     }
-
     
     // Add padding around the box.
     std::cout << "Computing SDF...\n";
@@ -146,29 +156,53 @@ int main(int argc, char* argv[]) {
     std::cout << "\n   The SDF has been computed!\n";
     std::cout << "   Elapsed time: " << (t_end - t_start)/(float)CLOCKS_PER_SEC << " seconds.\n";
 
-    // Saving as text file
-    std::string outname = filename.substr(0, filename.size()-4) + std::string("_sdf.txt");
-    std::cout << "Saving the SDF to file <" << outname << ">...\n";
-    std::ofstream fs;
-    fs.open(outname.c_str());
-    fs.precision(8); // Select precision here
-    if(!fs.is_open()){
-        std::cout << "   Error: Unable to open file! Check the permissions.\n";
-    }
-    fs << d_grid.ni << " " << d_grid.nj << " " << d_grid.nk << "\n";
-    fs << min_box[0] << " " << min_box[1] << " " << min_box[2] << "\n";
-    fs << dx << "\n";
-    uint p = 0;
-    for(uint k=0; k<d_grid.nk; k++){
-        std::cout << "\r   Progress " << 100.0*(float)k/(float)(d_grid.nk-1) << "%                ";
-        for(uint j=0; j<d_grid.nj; j++){
-            for(uint i=0; i<d_grid.ni; i++){
-                fs << d_grid.a[p] << " ";
-                p++;
+    if(format==0 || format==2){
+        // Saving as text file
+        std::string outname = filename.substr(0, filename.size()-4) + std::string(".txt");
+        std::cout << "Saving the SDF to text file <" << outname << ">...\n";
+        std::ofstream fs;
+        fs.open(outname.c_str());
+        fs.precision(8); // Select precision here
+        if(!fs.is_open()){
+            std::cerr << "   Error: Unable to open output file! Check the permissions.\n";
+            exit(-1);
+        }
+        fs << d_grid.ni << " " << d_grid.nj << " " << d_grid.nk << "\n";
+        fs << min_box[0] << " " << min_box[1] << " " << min_box[2] << "\n";
+        fs << dx << "\n";
+        uint p = 0;
+        for(uint k=0; k<d_grid.nk; k++){
+            std::cout << "\r   Progress " << 100.0*(float)k/(float)(d_grid.nk-1) << "%                ";
+            for(uint j=0; j<d_grid.nj; j++){
+                for(uint i=0; i<d_grid.ni; i++){
+                    fs << d_grid.a[p] << " ";
+                    p++;
+                }
             }
         }
+        fs.close();
     }
-    fs.close();
+    if(format==1 || format==2){
+        // Saving as binary file
+        std::string outname = filename.substr(0, filename.size()-4) + std::string(".sdf");
+        std::cout << "Saving the SDF to binary file <" << outname << ">...\n";
+        std::ofstream fs(outname.c_str(), std::ios::binary | std::ios::out);
+        if(!fs.is_open()){
+            std::cerr << "   Error: Unable to open output file! Check the permissions.\n";
+            exit(-1);
+        }
+        fs.write(reinterpret_cast<const char*>(&d_grid.ni),sizeof(d_grid.ni));
+        fs.write(reinterpret_cast<const char*>(&d_grid.nj),sizeof(d_grid.nj));
+        fs.write(reinterpret_cast<const char*>(&d_grid.nk),sizeof(d_grid.nk));
+        fs.write(reinterpret_cast<const char*>(&min_box[0]),sizeof(min_box[0]));
+        fs.write(reinterpret_cast<const char*>(&min_box[1]),sizeof(min_box[0]));
+        fs.write(reinterpret_cast<const char*>(&min_box[2]),sizeof(min_box[0]));
+        fs.write(reinterpret_cast<const char*>(&dx),sizeof(dx));
+        for(unsigned int i = 0; i < d_grid.a.size(); ++i) {
+            fs.write(reinterpret_cast<const char*>(&d_grid.a[i]),sizeof(d_grid.a[i]));
+        }
+        fs.close();
+    }
     std::cout << "\n   Saving completed.\n";
 
     std::cout << "SDFGen has finished. See you next time!\n";
