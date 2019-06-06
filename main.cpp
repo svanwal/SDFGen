@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Reading .OBJ shape model <" << filename << ">...\n";
     std::ifstream infile(argv[1]);
     if(!infile) {
-      std::cerr << "   Failed to open. Is it in the right folder? Terminating.\n";
+      std::cerr << "   Failed to open. Is it in the /SDFGen/data/ folder? Terminating.\n";
       exit(-1);
     }
 
